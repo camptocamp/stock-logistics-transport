@@ -8,20 +8,27 @@
         <field name="inherit_id" ref="stock.view_picking_form" />
         <field name="arch" type="xml">
             <header position="inside">
-                <field name="is_loaded_in_shipment" invisible="1" />
+                <field name="is_fully_loaded_in_shipment" invisible="1" />
+                <button
+                    name="button_plan_in_shipment"
+                    type="object"
+                    string="Plan in shipment"
+                    class="btn-primary"
+                    attrs="{'invisible': ['|', '|', ('planned_shipment_advice_id', '!=', False), ('picking_type_code', '!=', 'outgoing'), ('state', 'in', ('cancel', 'done'))]}"
+                />
                 <button
                     name="button_load_in_shipment"
                     type="object"
                     string="Load in shipment"
                     class="btn-primary"
-                    attrs="{'invisible': ['|', ('is_loaded_in_shipment', '=', True), ('picking_type_code', '!=', 'outgoing')]}"
+                    attrs="{'invisible': ['|', '|', ('is_fully_loaded_in_shipment', '=', True), ('picking_type_code', '!=', 'outgoing'), ('state', 'in', ('cancel', 'done'))]}"
                 />
                 <button
                     name="button_unload_from_shipment"
                     type="object"
                     string="Unload from shipment"
                     class="btn-primary"
-                    attrs="{'invisible': ['|', ('is_loaded_in_shipment', '=', False), ('picking_type_code', '!=', 'outgoing')]}"
+                    attrs="{'invisible': ['|', '|', ('is_fully_loaded_in_shipment', '=', False), ('picking_type_code', '!=', 'outgoing'), ('state', 'in', ('cancel', 'done'))]}"
                 />
             </header>
             <xpath
@@ -101,7 +108,14 @@
         <field name="model">stock.picking</field>
         <field name="priority" eval="110" />
         <field name="arch" type="xml">
-            <tree string="Transfers" create="0">
+            <tree
+                string="Transfers"
+                create="0"
+                decoration-success="is_fully_loaded_in_shipment"
+                decoration-warning="is_partially_loaded_in_shipment"
+            >
+                <field name="is_fully_loaded_in_shipment" invisible="1" />
+                <field name="is_partially_loaded_in_shipment" invisible="1" />
                 <field name="name" />
                 <field name="picking_type_code" invisible="1" />
                 <field name="loaded_packages_progress" />

@@ -371,7 +371,10 @@ class ShipmentAdvice(models.Model):
         )
         tree_view_index = action["views"].index((False, "tree"))
         action["views"][tree_view_index] = (view_tree.id, "tree")
-        action["domain"] = [("id", "in", self.loaded_picking_ids.ids)]
+        if self.planned_picking_ids:
+            action["domain"] = [("id", "in", self.planned_picking_ids.ids)]
+        else:
+            action["domain"] = [("id", "in", self.loaded_picking_ids.ids)]
         return action
 
     def button_open_receptions_in_progress(self):

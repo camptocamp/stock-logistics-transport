@@ -12,6 +12,7 @@
                 date_stop="departure_date"
                 mode="week"
                 color="dock_id"
+                quick_add="False"
             >
                 <field name="name" />
                 <field name="state" />
@@ -71,12 +72,12 @@
                             name="button_open_planned_pickings"
                             type="object"
                             class="oe_stat_button"
-                            icon="fa-clock-o"
+                            icon="fa-truck"
                             states="draft,confirmed"
                             attrs="{'invisible': [('planned_picking_ids', '=', [])]}"
                         >
                             <field
-                                string="Transfers"
+                                string="Planned"
                                 name="planned_pickings_count"
                                 widget="statinfo"
                             />
@@ -85,12 +86,12 @@
                             name="button_open_planned_moves"
                             type="object"
                             class="oe_stat_button"
-                            icon="fa-clock-o"
+                            icon="fa-list"
                             states="draft,confirmed"
                             attrs="{'invisible': [('planned_move_ids', '=', [])]}"
                         >
                             <field
-                                string="Content List"
+                                string="Planned bulk"
                                 name="planned_moves_count"
                                 widget="statinfo"
                             />
@@ -104,7 +105,7 @@
                             attrs="{'invisible': ['|', ('shipment_type', '!=', 'outgoing'), ('loaded_picking_ids', '=', [])]}"
                         >
                             <field
-                                string="Transfers"
+                                string="Loaded"
                                 name="loaded_pickings_count"
                                 widget="statinfo"
                             />
@@ -113,12 +114,12 @@
                             name="button_open_loaded_move_lines"
                             type="object"
                             class="oe_stat_button"
-                            icon="fa-truck"
+                            icon="fa-list"
                             states="in_progress"
                             attrs="{'invisible': ['|', ('shipment_type', '!=', 'outgoing'), ('loaded_move_line_without_package_ids', '=', [])]}"
                         >
                             <field
-                                string="Content List"
+                                string="Loaded bulk"
                                 name="loaded_move_lines_without_package_count"
                                 widget="statinfo"
                             />
@@ -132,7 +133,7 @@
                             attrs="{'invisible': ['|', ('shipment_type', '!=', 'outgoing'), ('loaded_package_ids', '=', [])]}"
                         >
                             <field
-                                string="Packages"
+                                string="Loaded packages"
                                 name="loaded_packages_count"
                                 widget="statinfo"
                             />
@@ -183,8 +184,9 @@
                     <field name="loaded_package_ids" invisible="1" />
                     <notebook>
                         <page
-                            string="Loaded content list"
+                            string="Lading"
                             name="loaded_move_lines_without_package"
+                            attrs="{'invisible': [('state', 'in', ('draft', 'confirmed'))]}"
                         >
                             <span class="o_horizontal_separator">Bulk content</span>
                             <field name="loaded_move_line_without_package_ids">
@@ -269,6 +271,16 @@
                     string="Outgoing"
                     domain="[('shipment_type', '=', 'outgoing')]"
                 />
+                <filter
+                    string="Today"
+                    name="today"
+                    domain="[('arrival_date','&gt;=', ((context_today()).strftime('%Y-%m-%d'))), ('arrival_date','&lt;=', ((context_today()+datetime.timedelta(days=1)).strftime('%Y-%m-%d')))]"
+                />
+                <filter
+                    string="This Week"
+                    name="week"
+                    domain="[('arrival_date','&gt;=', ((context_today()).strftime('%Y-%m-%d'))), ('arrival_date','&lt;=', ((context_today()+datetime.timedelta(days=7)).strftime('%Y-%m-%d')))]"
+                />
                 <group expand="0" string="Group By">
                     <filter
                         string="Loading dock"
@@ -296,7 +308,6 @@
         <field name="name">Shipment Advices</field>
         <field name="type">ir.actions.act_window</field>
         <field name="res_model">shipment.advice</field>
-        <field name="view_id" ref="shipment_advice_view_tree" />
         <field name="view_mode">calendar,tree,form</field>
     </record>
     <record

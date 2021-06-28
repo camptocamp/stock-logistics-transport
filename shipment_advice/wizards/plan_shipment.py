@@ -17,7 +17,7 @@ class WizardPlanShipment(models.TransientModel):
         comodel_name="shipment.advice",
         string="Shipment Advice",
         required=True,
-        domain=[("state", "=", "draft")],
+        domain=[("state", "in", ("draft", "confirmed"))],
     )
     warning = fields.Char(string="Warning", readonly=True)
 
@@ -125,6 +125,10 @@ class WizardPlanShipment(models.TransientModel):
         self.ensure_one()
         self.picking_ids.move_lines.shipment_advice_id = self.shipment_advice_id
         self.move_ids.shipment_advice_id = self.shipment_advice_id
+        view_form = self.env.ref("shipment_advice.shipment_advice_view_form")
         action = self.env.ref("shipment_advice.shipment_advice_action").read()[0]
+        del action["views"]
         action["res_id"] = self.shipment_advice_id.id
+        action["view_id"] = view_form.id
+        action["view_mode"] = "form"
         return action

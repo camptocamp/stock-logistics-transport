@@ -13,8 +13,13 @@ class StockPicking(models.Model):
         store=True,
         index=True,
     )
-    is_loaded_in_shipment = fields.Boolean(
-        string="Is loaded in a shipment?", compute="_compute_is_loaded_in_shipment",
+    is_fully_loaded_in_shipment = fields.Boolean(
+        string="Is fully loaded in a shipment?",
+        compute="_compute_is_loaded_in_shipment",
+    )
+    is_partially_loaded_in_shipment = fields.Boolean(
+        string="Is partially loaded in a shipment?",
+        compute="_compute_is_loaded_in_shipment",
     )
     loaded_packages_progress = fields.Char(
         "Packages loaded/total", compute="_compute_shipment_count"
@@ -29,8 +34,12 @@ class StockPicking(models.Model):
     @api.depends("move_line_ids.shipment_advice_id")
     def _compute_is_loaded_in_shipment(self):
         for picking in self:
-            picking.is_loaded_in_shipment = all(
+            picking.is_fully_loaded_in_shipment = all(
                 line.shipment_advice_id for line in picking.move_line_ids
+            )
+            picking.is_partially_loaded_in_shipment = (
+                not picking.is_fully_loaded_in_shipment
+                and any(line.shipment_advice_id for line in picking.move_line_ids)
             )
 
     @api.depends("package_level_ids.package_id")
@@ -79,6 +88,13 @@ class StockPicking(models.Model):
                 picking.loaded_weight_progress = (
                     f"{loaded_weight}/{picking.shipping_weight}"
                 )
+
+    def button_plan_in_shipment(self):
+        action = self.env.ref(
+            "shipment_advice.wizard_plan_shipment_picking_action"
+        ).read()[0]
+        action["context"] = {"active_model": self._name, "active_ids": self.ids}
+        return action
 
     def button_load_in_shipment(self):
         action = self.env.ref(

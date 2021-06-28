@@ -187,7 +187,11 @@ class WizardLoadInShipment(models.TransientModel):
         if self.shipment_advice_id.state == "confirmed":
             self.shipment_advice_id.action_in_progress()
         if self.open_shipment:
+            view_form = self.env.ref("shipment_advice.shipment_advice_view_form")
             action = self.env.ref("shipment_advice.shipment_advice_action").read()[0]
+            del action["views"]
             action["res_id"] = self.shipment_advice_id.id
+            action["view_id"] = view_form.id
+            action["view_mode"] = "form"
             return action
         return True
