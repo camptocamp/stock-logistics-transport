@@ -2,6 +2,7 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl)
 
 from odoo import api, fields, models
+from odoo.tools import float_round
 
 
 class StockPicking(models.Model):
@@ -14,25 +15,27 @@ class StockPicking(models.Model):
         index=True,
     )
     is_fully_loaded_in_shipment = fields.Boolean(
-        string="Is fully loaded in a shipment?",
-        compute="_compute_is_loaded_in_shipment",
+        string="Is fully loaded in a shipment?", compute="_compute_loaded_in_shipment",
     )
     is_partially_loaded_in_shipment = fields.Boolean(
         string="Is partially loaded in a shipment?",
-        compute="_compute_is_loaded_in_shipment",
+        compute="_compute_loaded_in_shipment",
     )
     loaded_packages_progress = fields.Char(
-        "Packages loaded/total", compute="_compute_shipment_count"
+        "Packages loaded/total", compute="_compute_shipment_loaded_progress"
     )
     loaded_move_lines_progress = fields.Char(
-        "Lines loaded/total", compute="_compute_shipment_count"
+        "Lines loaded/total", compute="_compute_shipment_loaded_progress"
     )
     loaded_weight_progress = fields.Char(
-        "Weight/total", compute="_compute_shipment_count"
+        "Weight/total", compute="_compute_shipment_loaded_progress"
+    )
+    loaded_shipment_advice_ids = fields.Many2many(
+        "shipment.advice", compute="_compute_loaded_in_shipment",
     )
 
     @api.depends("move_line_ids.shipment_advice_id")
-    def _compute_is_loaded_in_shipment(self):
+    def _compute_loaded_in_shipment(self):
         for picking in self:
             picking.is_fully_loaded_in_shipment = all(
                 line.shipment_advice_id for line in picking.move_line_ids
@@ -41,22 +44,25 @@ class StockPicking(models.Model):
                 not picking.is_fully_loaded_in_shipment
                 and any(line.shipment_advice_id for line in picking.move_line_ids)
             )
+            picking.loaded_shipment_advice_ids = (
+                picking.move_line_ids.shipment_advice_id
+            )
 
     @api.depends("package_level_ids.package_id")
-    def _compute_shipment_count(self):
+    def _compute_shipment_loaded_progress(self):
         for picking in self:
             picking.loaded_packages_progress = ""
             picking.loaded_move_lines_progress = ""
             picking.loaded_weight_progress = ""
             total_packages_count = len(picking.package_level_ids.package_id)
-            total_move_lines_count = len(picking.move_line_ids)
+            total_move_lines_count = len(picking.move_line_ids_without_package)
             # Packages loading progress
             if total_packages_count:
                 loaded_packages_count = len(
                     [pl for pl in picking.package_level_ids if pl.shipment_advice_id]
                 )
                 picking.loaded_packages_progress = (
-                    f"{loaded_packages_count}/{total_packages_count}"
+                    f"{loaded_packages_count} / {total_packages_count}"
                 )
             # Lines loading progress
             if total_move_lines_count:
@@ -68,7 +74,7 @@ class StockPicking(models.Model):
                     ]
                 )
                 picking.loaded_move_lines_progress = (
-                    f"{loaded_move_lines_count}/{total_move_lines_count}"
+                    f"{loaded_move_lines_count} / {total_move_lines_count}"
                 )
             # Weight/total
             if picking.shipping_weight:
@@ -85,9 +91,10 @@ class StockPicking(models.Model):
                         if pl.shipment_advice_id
                     ]
                 )
-                picking.loaded_weight_progress = (
-                    f"{loaded_weight}/{picking.shipping_weight}"
+                total_weight = float_round(
+                    picking.shipping_weight, precision_rounding=0.01,
                 )
+                picking.loaded_weight_progress = f"{loaded_weight} / {total_weight}"
 
     def button_plan_in_shipment(self):
         action = self.env.ref(

@@ -62,6 +62,7 @@ class ShipmentAdvice(models.Model):
         string="Loading dock",
         states={"draft": [("readonly", False)], "confirmed": [("readonly", False)]},
         readonly=True,
+        index=True,
     )
     arrival_date = fields.Datetime(
         string="Arrival date",
@@ -374,7 +375,23 @@ class ShipmentAdvice(models.Model):
         if self.planned_picking_ids:
             action["domain"] = [("id", "in", self.planned_picking_ids.ids)]
         else:
-            action["domain"] = [("id", "in", self.loaded_picking_ids.ids)]
+            domain = [
+                ("picking_type_id.code", "=", self.shipment_type),
+                ("state", "=", "assigned"),
+                # Loaded in the current shipment or not loaded at all
+                "|",
+                ("move_line_ids.shipment_advice_id", "=", self.id),
+                ("move_line_ids.shipment_advice_id", "=", False),
+            ]
+            if self.planned_move_ids:
+                # and planned in the same shipment
+                domain.append(("move_lines.shipment_advice_id", "=", self.id))
+            else:
+                domain.append(("move_lines.shipment_advice_id", "=", False))
+            if self.carrier_ids:
+                domain.append(("carrier_id", "in", self.carrier_ids.ids))
+            pickings = self.env["stock.picking"].search(domain)
+            action["domain"] = [("id", "in", pickings.ids)]
         return action
 
     def button_open_receptions_in_progress(self):
