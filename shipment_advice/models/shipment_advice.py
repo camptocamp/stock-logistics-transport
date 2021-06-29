@@ -69,8 +69,8 @@ class ShipmentAdvice(models.Model):
         states={"draft": [("readonly", False)], "confirmed": [("readonly", False)]},
         readonly=True,
         help=(
-            "When will the shipment arrives at the (un)loading dock, it is a "
-            "planned date until in progress, then it represent the real one."
+            "When will the shipment arrive at the (un)loading dock. It is a "
+            "planned date until in progress, then it represents the real one."
         ),
     )
     departure_date = fields.Datetime(
@@ -82,8 +82,8 @@ class ShipmentAdvice(models.Model):
         },
         readonly=True,
         help=(
-            "When will the shipment leaves the (un)loading dock, it is a "
-            "planned date until in progress, then it represent the real one."
+            "When will the shipment leave the (un)loading dock. It is a "
+            "planned date until in progress, then it represents the real one."
         ),
     )
     ref = fields.Char(
@@ -177,10 +177,10 @@ class ShipmentAdvice(models.Model):
         ),
     ]
 
-    @api.depends("loaded_package_ids")
+    @api.depends("loaded_move_line_ids.result_package_id.shipping_weight")
     def _compute_total_load(self):
         for shipment in self:
-            packages = self.loaded_move_line_ids.result_package_id
+            packages = shipment.loaded_move_line_ids.result_package_id
             shipment.total_load = sum(packages.mapped("shipping_weight"))
 
     @api.depends("planned_move_ids", "loaded_move_line_ids")
@@ -206,13 +206,13 @@ class ShipmentAdvice(models.Model):
     @api.depends("planned_picking_ids", "planned_move_ids")
     def _compute_count(self):
         for shipment in self:
-            shipment.planned_pickings_count = len(self.planned_picking_ids)
-            shipment.planned_moves_count = len(self.planned_move_ids)
-            shipment.loaded_pickings_count = len(self.loaded_picking_ids)
+            shipment.planned_pickings_count = len(shipment.planned_picking_ids)
+            shipment.planned_moves_count = len(shipment.planned_move_ids)
+            shipment.loaded_pickings_count = len(shipment.loaded_picking_ids)
             shipment.loaded_move_lines_without_package_count = len(
-                self.loaded_move_line_without_package_ids
+                shipment.loaded_move_line_without_package_ids
             )
-            shipment.loaded_packages_count = len(self.loaded_package_ids)
+            shipment.loaded_packages_count = len(shipment.loaded_package_ids)
 
     @api.depends("planned_picking_ids", "loaded_picking_ids")
     def _compute_carrier_ids(self):
@@ -242,10 +242,9 @@ class ShipmentAdvice(models.Model):
                 )
             if not shipment.arrival_date:
                 raise UserError(
-                    _(
-                        "Arrival/departure date should be set on the "
-                        "shipment advice {}."
-                    ).format(shipment.name)
+                    _("Arrival date should be set on the shipment advice {}.").format(
+                        shipment.name
+                    )
                 )
             shipment.state = "confirmed"
         return True

@@ -26,63 +26,73 @@ class WizardUnplanShipment(models.TransientModel):
                 _("Please select at least one record to unplan from shipment.")
             )
         if active_model == "stock.picking" and active_ids:
-            pickings = self.env[active_model].browse(active_ids)
-            # We keep only deliveries and receptions not canceled/done
-            pickings_to_keep = pickings.filtered(
-                lambda o: (
-                    o.state not in ["cancel", "done"]
-                    and o.move_lines.shipment_advice_id
-                    and all(
-                        state in ("draft", "confirmed")
-                        for state in o.move_lines.shipment_advice_id.mapped("state")
-                    )
-                    and o.picking_type_code in ("incoming", "outgoing")
-                )
-            )
-            res["picking_ids"] = pickings_to_keep.ids
-            if not pickings_to_keep:
-                res["warning"] = _(
-                    "No transfer to unplan among selected ones (already done or "
-                    "not related to a shipment)."
-                )
-            elif pickings != pickings_to_keep:
-                res["warning"] = _(
-                    "Transfers to include have been updated, keeping only those "
-                    "still in progress and related to a shipment."
-                )
+            res = self._default_get_from_stock_picking(res, active_ids)
         if active_model == "stock.move" and active_ids:
-            moves = self.env[active_model].browse(active_ids)
-            # We keep only deliveries and receptions not canceled/done
-            # and not linked to a package level itself linked to other moves
-            # (we want to unplan the package as a whole, not a part of it)
-            moves_to_keep = self.env["stock.move"]
-            for move in moves:
-                other_moves = (
-                    move.move_line_ids.package_level_id.move_line_ids.move_id
-                    + move.package_level_id.move_ids
-                ) - move
-                if other_moves:
-                    continue
-                moves_to_keep |= move
-            moves_to_keep = moves_to_keep.filtered_domain(
-                [
-                    ("state", "not in", ["cancel", "done"]),
-                    ("shipment_advice_id", "!=", False),
-                    ("shipment_advice_id.state", "in", ("draft", "confirmed")),
-                ]
+            res = self._default_get_from_stock_move(res, active_ids)
+        return res
+
+    @api.model
+    def _default_get_from_stock_picking(self, res, ids):
+        pickings = self.env["stock.picking"].browse(ids)
+        # We keep only deliveries and receptions not canceled/done
+        pickings_to_keep = pickings.filtered(
+            lambda o: (
+                o.state not in ["cancel", "done"]
+                and o.move_lines.shipment_advice_id
+                and all(
+                    state in ("draft", "confirmed")
+                    for state in o.move_lines.shipment_advice_id.mapped("state")
+                )
+                and o.picking_type_code in ("incoming", "outgoing")
             )
-            res["move_ids"] = moves_to_keep.ids
-            if not moves_to_keep:
-                res["warning"] = _(
-                    "No move to unplan among selected ones (already done, "
-                    "linked to other moves through a package, or not related "
-                    "to a shipment)."
-                )
-            elif moves != moves_to_keep:
-                res["warning"] = _(
-                    "Moves to include have been updated, keeping only those "
-                    "still in progress and related to a shipment."
-                )
+        )
+        res["picking_ids"] = pickings_to_keep.ids
+        if not pickings_to_keep:
+            res["warning"] = _(
+                "No transfer to unplan among selected ones (already done or "
+                "not related to a shipment)."
+            )
+        elif pickings != pickings_to_keep:
+            res["warning"] = _(
+                "Transfers to include have been updated, keeping only those "
+                "still in progress and related to a shipment."
+            )
+        return res
+
+    @api.model
+    def _default_get_from_stock_move(self, res, ids):
+        moves = self.env["stock.move"].browse(ids)
+        # We keep only deliveries and receptions not canceled/done
+        # and not linked to a package level itself linked to other moves
+        # (we want to unplan the package as a whole, not a part of it)
+        moves_to_keep = self.env["stock.move"]
+        for move in moves:
+            other_moves = (
+                move.move_line_ids.package_level_id.move_line_ids.move_id
+                + move.package_level_id.move_ids
+            ) - move
+            if other_moves:
+                continue
+            moves_to_keep |= move
+        moves_to_keep = moves_to_keep.filtered_domain(
+            [
+                ("state", "not in", ["cancel", "done"]),
+                ("shipment_advice_id", "!=", False),
+                ("shipment_advice_id.state", "in", ("draft", "confirmed")),
+            ]
+        )
+        res["move_ids"] = moves_to_keep.ids
+        if not moves_to_keep:
+            res["warning"] = _(
+                "No move to unplan among selected ones (already done, "
+                "linked to other moves through a package, or not related "
+                "to a shipment)."
+            )
+        elif moves != moves_to_keep:
+            res["warning"] = _(
+                "Moves to include have been updated, keeping only those "
+                "still in progress and related to a shipment."
+            )
         return res
 
     def action_unplan(self):

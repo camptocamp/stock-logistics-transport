@@ -48,7 +48,7 @@ class StockPicking(models.Model):
                 picking.move_line_ids.shipment_advice_id
             )
 
-    @api.depends("package_level_ids.package_id")
+    @api.depends("package_level_ids.package_id", "move_line_ids")
     def _compute_shipment_loaded_progress(self):
         for picking in self:
             picking.loaded_packages_progress = ""

@@ -38,86 +38,99 @@ class WizardLoadInShipment(models.TransientModel):
                 _("Please select at least one record to load in a shipment.")
             )
         if active_model == "stock.picking" and active_ids:
-            pickings = self.env[active_model].browse(active_ids)
-            # We keep only deliveries and receptions not canceled/done
-            pickings_to_keep = pickings.filtered_domain(
-                [("state", "=", "assigned"), ("picking_type_id.code", "=", "outgoing")]
-            )
-            res["picking_ids"] = pickings_to_keep.ids
-            if not pickings_to_keep:
-                res["warning"] = _(
-                    "No transfer to load among selected ones (already done or "
-                    "not qualified as delivery)."
-                )
-            elif pickings != pickings_to_keep:
-                res["warning"] = _(
-                    "Transfers to include have been updated, keeping only those "
-                    "assigned and qualified as delivery."
-                )
-            # Prefill the shipment if any (we take the first one)
-            res["shipment_advice_id"] = fields.first(
-                pickings_to_keep.move_lines.shipment_advice_id
-            ).id
-            # Prefill the shipment with the planned one if any (we take the first one)
-            res["shipment_advice_id"] = fields.first(
-                pickings_to_keep.move_lines.shipment_advice_id
-            ).id
+            res = self._default_get_from_stock_picking(res, active_ids)
         if active_model == "stock.move.line" and active_ids:
-            lines = self.env[active_model].browse(active_ids)
-            # We keep only deliveries not canceled/done
-            if not lines._check_entire_package():
-                raise UserError(
-                    _(
-                        "You cannot load move lines which are part of a package, "
-                        "unless you select all the move lines related to this package."
-                    )
-                )
-            lines_to_keep = lines.filtered_domain(
-                [
-                    ("state", "in", ("assigned", "partially_available")),
-                    ("picking_id.picking_type_id.code", "=", "outgoing"),
-                ]
-            )
-            res["move_line_ids"] = lines_to_keep.ids
-            if not lines_to_keep:
-                res["warning"] = _(
-                    "No product to load among selected ones (already done or "
-                    "not qualified as delivery)."
-                )
-            elif lines != lines_to_keep:
-                res["warning"] = _(
-                    "Lines to include have been updated, keeping only those "
-                    "qualified as delivery."
-                )
-            # Prefill the shipment with the planned one if any
-            res["shipment_advice_id"] = fields.first(
-                lines_to_keep.move_id.shipment_advice_id
-            ).id
+            res = self._default_get_from_stock_move_line(res, active_ids)
         if active_model == "stock.package_level" and active_ids:
-            package_levels = self.env[active_model].browse(active_ids)
-            # We keep only deliveries and receptions not canceled/done
-            package_levels_to_keep = package_levels.filtered_domain(
-                [
-                    ("state", "not in", ("done", "cancel")),
-                    ("picking_type_code", "=", "outgoing"),
-                ]
+            res = self._default_get_from_stock_package_level(res, active_ids)
+        return res
+
+    @api.model
+    def _default_get_from_stock_picking(self, res, ids):
+        pickings = self.env["stock.picking"].browse(ids)
+        # We keep only deliveries and receptions not canceled/done
+        pickings_to_keep = pickings.filtered_domain(
+            [("state", "=", "assigned"), ("picking_type_id.code", "=", "outgoing")]
+        )
+        res["picking_ids"] = pickings_to_keep.ids
+        if not pickings_to_keep:
+            res["warning"] = _(
+                "No transfer to load among selected ones (already done or "
+                "not qualified as delivery)."
             )
-            res["package_level_ids"] = package_levels_to_keep.ids
-            if not package_levels_to_keep:
-                res["warning"] = _(
-                    "No package to load among selected ones (already done or "
-                    "not qualified as delivery)."
+        elif pickings != pickings_to_keep:
+            res["warning"] = _(
+                "Transfers to include have been updated, keeping only those "
+                "assigned and qualified as delivery."
+            )
+        # Prefill the shipment if any (we take the first one)
+        res["shipment_advice_id"] = fields.first(
+            pickings_to_keep.move_lines.shipment_advice_id
+        ).id
+        # Prefill the shipment with the planned one if any (we take the first one)
+        res["shipment_advice_id"] = fields.first(
+            pickings_to_keep.move_lines.shipment_advice_id
+        ).id
+        return res
+
+    def _default_get_from_stock_move_line(self, res, ids):
+        lines = self.env["stock.move.line"].browse(ids)
+        # We keep only deliveries not canceled/done
+        if not lines._check_entire_package():
+            raise UserError(
+                _(
+                    "You cannot load move lines which are part of a package, "
+                    "unless you select all the move lines related to this package."
                 )
-            elif package_levels != package_levels_to_keep:
-                res["warning"] = _(
-                    "Packages to include have been updated, keeping only those "
-                    "qualified as delivery."
-                )
-            # Prefill the shipment with the planned one if any
-            res["shipment_advice_id"] = fields.first(
-                package_levels_to_keep.move_ids.shipment_advice_id
-                or package_levels_to_keep.move_line_ids.move_id.shipment_advice_id
-            ).id
+            )
+        lines_to_keep = lines.filtered_domain(
+            [
+                ("state", "in", ("assigned", "partially_available")),
+                ("picking_id.picking_type_id.code", "=", "outgoing"),
+            ]
+        )
+        res["move_line_ids"] = lines_to_keep.ids
+        if not lines_to_keep:
+            res["warning"] = _(
+                "No product to load among selected ones (already done or "
+                "not qualified as delivery)."
+            )
+        elif lines != lines_to_keep:
+            res["warning"] = _(
+                "Lines to include have been updated, keeping only those "
+                "qualified as delivery."
+            )
+        # Prefill the shipment with the planned one if any
+        res["shipment_advice_id"] = fields.first(
+            lines_to_keep.move_id.shipment_advice_id
+        ).id
+        return res
+
+    def _default_get_from_stock_package_level(self, res, ids):
+        package_levels = self.env["stock.package_level"].browse(ids)
+        # We keep only deliveries and receptions not canceled/done
+        package_levels_to_keep = package_levels.filtered_domain(
+            [
+                ("state", "not in", ("done", "cancel")),
+                ("picking_type_code", "=", "outgoing"),
+            ]
+        )
+        res["package_level_ids"] = package_levels_to_keep.ids
+        if not package_levels_to_keep:
+            res["warning"] = _(
+                "No package to load among selected ones (already done or "
+                "not qualified as delivery)."
+            )
+        elif package_levels != package_levels_to_keep:
+            res["warning"] = _(
+                "Packages to include have been updated, keeping only those "
+                "qualified as delivery."
+            )
+        # Prefill the shipment with the planned one if any
+        res["shipment_advice_id"] = fields.first(
+            package_levels_to_keep.move_ids.shipment_advice_id
+            or package_levels_to_keep.move_line_ids.move_id.shipment_advice_id
+        ).id
         return res
 
     @api.onchange("shipment_advice_id")

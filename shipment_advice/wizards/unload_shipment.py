@@ -28,55 +28,65 @@ class WizardUnloadShipment(models.TransientModel):
                 _("Please select at least one record to unload from shipment.")
             )
         if active_model == "stock.picking" and active_ids:
-            pickings = self.env[active_model].browse(active_ids)
-            # We keep only deliveries not canceled/done
-            pickings_to_keep = pickings.filtered(
-                lambda o: (
-                    o.state not in ["cancel", "done"]
-                    and o.move_line_ids.shipment_advice_id
-                    and all(
-                        state == "in_progress"
-                        for state in o.move_line_ids.shipment_advice_id.mapped("state")
-                    )
-                    and o.picking_type_code == "outgoing"
-                )
-            )
-            res["picking_ids"] = pickings_to_keep.ids
-            if not pickings_to_keep:
-                res["warning"] = _(
-                    "No transfer to unload among selected ones (already done or "
-                    "not related to a shipment)."
-                )
-            elif pickings != pickings_to_keep:
-                res["warning"] = _(
-                    "Transfers to include have been updated, keeping only those "
-                    "still in progress and related to a shipment."
-                )
+            res = self._default_get_from_stock_picking(res, active_ids)
         if active_model == "stock.move.line" and active_ids:
-            lines = self.env[active_model].browse(active_ids)
-            # We keep only deliveries not canceled/done
-            lines_to_keep = lines.filtered(
-                lambda o: (
-                    o.state not in ["cancel", "done"]
-                    and o.shipment_advice_id
-                    and all(
-                        state == "in_progress"
-                        for state in o.shipment_advice_id.mapped("state")
-                    )
-                    and o.picking_code == "outgoing"
+            res = self._default_get_from_stock_move_line(res, active_ids)
+        return res
+
+    @api.model
+    def _default_get_from_stock_picking(self, res, ids):
+        pickings = self.env["stock.picking"].browse(ids)
+        # We keep only deliveries not canceled/done
+        pickings_to_keep = pickings.filtered(
+            lambda o: (
+                o.state not in ["cancel", "done"]
+                and o.move_line_ids.shipment_advice_id
+                and all(
+                    state == "in_progress"
+                    for state in o.move_line_ids.shipment_advice_id.mapped("state")
                 )
+                and o.picking_type_code == "outgoing"
             )
-            res["move_line_ids"] = lines_to_keep.ids
-            if not lines_to_keep:
-                res["warning"] = _(
-                    "No product to unload among selected ones (already done or "
-                    "not related to a shipment)."
+        )
+        res["picking_ids"] = pickings_to_keep.ids
+        if not pickings_to_keep:
+            res["warning"] = _(
+                "No transfer to unload among selected ones (already done or "
+                "not related to a shipment)."
+            )
+        elif pickings != pickings_to_keep:
+            res["warning"] = _(
+                "Transfers to include have been updated, keeping only those "
+                "still in progress and related to a shipment."
+            )
+        return res
+
+    @api.model
+    def _default_get_from_stock_move_line(self, res, ids):
+        lines = self.env["stock.move.line"].browse(ids)
+        # We keep only deliveries not canceled/done
+        lines_to_keep = lines.filtered(
+            lambda o: (
+                o.state not in ["cancel", "done"]
+                and o.shipment_advice_id
+                and all(
+                    state == "in_progress"
+                    for state in o.shipment_advice_id.mapped("state")
                 )
-            elif lines != lines_to_keep:
-                res["warning"] = _(
-                    "Products to include have been updated, keeping only those "
-                    "still in progress and related to a shipment."
-                )
+                and o.picking_code == "outgoing"
+            )
+        )
+        res["move_line_ids"] = lines_to_keep.ids
+        if not lines_to_keep:
+            res["warning"] = _(
+                "No product to unload among selected ones (already done or "
+                "not related to a shipment)."
+            )
+        elif lines != lines_to_keep:
+            res["warning"] = _(
+                "Products to include have been updated, keeping only those "
+                "still in progress and related to a shipment."
+            )
         return res
 
     def action_unload(self):

@@ -16,7 +16,7 @@ class ResCompany(models.Model):
         default="create_backorder",
         help=(
             "If you want that closing an outgoing shipment advice marks as "
-            "done all related deliveries and create backorder in case of "
+            "done all related deliveries and creates backorder in case of "
             "partial choose 'Create backorder'.\nIf you want to mark "
             "deliveries as done only when they are all loaded in a shipment "
             "advice choose 'Leave open'. This last option is useful when your "

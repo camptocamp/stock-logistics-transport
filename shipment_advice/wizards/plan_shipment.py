@@ -32,57 +32,67 @@ class WizardPlanShipment(models.TransientModel):
                 _("Please select at least one record to plan in a shipment.")
             )
         if active_model == "stock.picking" and active_ids:
-            pickings = self.env[active_model].browse(active_ids)
-            # We keep only deliveries and receptions not canceled/done
-            pickings_to_keep = pickings.filtered_domain(
-                [
-                    ("state", "not in", ["cancel", "done"]),
-                    ("picking_type_code", "in", ["incoming", "outgoing"]),
-                ]
-            )
-            res["picking_ids"] = pickings_to_keep.ids
-            if not pickings_to_keep:
-                res["warning"] = _(
-                    "No transfer to plan among selected ones (already done or "
-                    "not qualified as deliveries/receptions)."
-                )
-            elif pickings != pickings_to_keep:
-                res["warning"] = _(
-                    "Transfers to include have been updated, keeping only those "
-                    "still in progress and qualified as delivery/reception."
-                )
+            res = self._default_get_from_stock_picking(res, active_ids)
         if active_model == "stock.move" and active_ids:
-            moves = self.env[active_model].browse(active_ids)
-            # We keep only deliveries and receptions not canceled/done
-            # and not linked to a package level itself linked to other moves
-            # (we want to plan the package as a whole, not a part of it)
-            moves_to_keep = self.env["stock.move"]
-            for move in moves:
-                other_moves = (
-                    move.move_line_ids.package_level_id.move_line_ids.move_id
-                    + move.package_level_id.move_ids
-                ) - move
-                if other_moves:
-                    continue
-                moves_to_keep |= move
-            moves_to_keep = moves_to_keep.filtered_domain(
-                [
-                    ("state", "not in", ["cancel", "done"]),
-                    ("picking_type_id.code", "in", ["incoming", "outgoing"]),
-                ]
+            res = self._default_get_from_stock_move(res, active_ids)
+        return res
+
+    @api.model
+    def _default_get_from_stock_picking(self, res, ids):
+        pickings = self.env["stock.picking"].browse(ids)
+        # We keep only deliveries and receptions not canceled/done
+        pickings_to_keep = pickings.filtered_domain(
+            [
+                ("state", "not in", ["cancel", "done"]),
+                ("picking_type_code", "in", ["incoming", "outgoing"]),
+            ]
+        )
+        res["picking_ids"] = pickings_to_keep.ids
+        if not pickings_to_keep:
+            res["warning"] = _(
+                "No transfer to plan among selected ones (already done or "
+                "not qualified as deliveries/receptions)."
             )
-            res["move_ids"] = moves_to_keep.ids
-            if not moves_to_keep:
-                res["warning"] = _(
-                    "No move to plan among selected ones (already done, "
-                    "linked to other moves through a package, or not related "
-                    "to a delivery/reception)."
-                )
-            elif moves != moves_to_keep:
-                res["warning"] = _(
-                    "Moves to include have been updated, keeping only those "
-                    "still in progress and related to a delivery/reception."
-                )
+        elif pickings != pickings_to_keep:
+            res["warning"] = _(
+                "Transfers to include have been updated, keeping only those "
+                "still in progress and qualified as delivery/reception."
+            )
+        return res
+
+    @api.model
+    def _default_get_from_stock_move(self, res, ids):
+        moves = self.env["stock.move"].browse(ids)
+        # We keep only deliveries and receptions not canceled/done
+        # and not linked to a package level itself linked to other moves
+        # (we want to plan the package as a whole, not a part of it)
+        moves_to_keep = self.env["stock.move"]
+        for move in moves:
+            other_moves = (
+                move.move_line_ids.package_level_id.move_line_ids.move_id
+                + move.package_level_id.move_ids
+            ) - move
+            if other_moves:
+                continue
+            moves_to_keep |= move
+        moves_to_keep = moves_to_keep.filtered_domain(
+            [
+                ("state", "not in", ["cancel", "done"]),
+                ("picking_type_id.code", "in", ["incoming", "outgoing"]),
+            ]
+        )
+        res["move_ids"] = moves_to_keep.ids
+        if not moves_to_keep:
+            res["warning"] = _(
+                "No move to plan among selected ones (already done, "
+                "linked to other moves through a package, or not related "
+                "to a delivery/reception)."
+            )
+        elif moves != moves_to_keep:
+            res["warning"] = _(
+                "Moves to include have been updated, keeping only those "
+                "still in progress and related to a delivery/reception."
+            )
         return res
 
     @api.onchange("shipment_advice_id")
