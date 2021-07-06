@@ -117,6 +117,10 @@ class StockPicking(models.Model):
         action["context"] = {"active_model": self._name, "active_ids": self.ids}
         return action
 
+    def _plan_in_shipment(self, shipment_advice):
+        """Plan the whole transfers content into the given shipment advice."""
+        self.move_lines._plan_in_shipment(shipment_advice)
+
     def _load_in_shipment(self, shipment_advice):
         """Load the whole transfers content into the given shipment advice."""
         self.package_level_ids._load_in_shipment(shipment_advice)

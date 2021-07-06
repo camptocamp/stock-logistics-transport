@@ -13,3 +13,7 @@ class StockMove(models.Model):
         string="Planned shipment",
         index=True,
     )
+
+    def _plan_in_shipment(self, shipment_advice):
+        """Plan the moves into the given shipment advice."""
+        self.shipment_advice_id = shipment_advice

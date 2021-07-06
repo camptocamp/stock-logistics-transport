@@ -133,8 +133,8 @@ class WizardPlanShipment(models.TransientModel):
     def action_plan(self):
         """Plan the selected records in the selected shipment."""
         self.ensure_one()
-        self.picking_ids.move_lines.shipment_advice_id = self.shipment_advice_id
-        self.move_ids.shipment_advice_id = self.shipment_advice_id
+        self.picking_ids._plan_in_shipment(self.shipment_advice_id)
+        self.move_ids._plan_in_shipment(self.shipment_advice_id)
         view_form = self.env.ref("shipment_advice.shipment_advice_view_form")
         action = self.env.ref("shipment_advice.shipment_advice_action").read()[0]
         del action["views"]
