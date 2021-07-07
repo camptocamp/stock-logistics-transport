@@ -71,7 +71,7 @@ class WizardPlanShipment(models.TransientModel):
             other_moves = (
                 move.move_line_ids.package_level_id.move_line_ids.move_id
                 + move.package_level_id.move_ids
-            ) - move
+            ) - moves
             if other_moves:
                 continue
             moves_to_keep |= move
