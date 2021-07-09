@@ -54,11 +54,15 @@ class StockPicking(models.Model):
     def _compute_loaded_in_shipment(self):
         for picking in self:
             picking.is_fully_loaded_in_shipment = all(
-                line.shipment_advice_id for line in picking.move_line_ids
+                line.shipment_advice_id and line.qty_done == line.product_uom_qty
+                for line in picking.move_line_ids
             )
             picking.is_partially_loaded_in_shipment = (
                 not picking.is_fully_loaded_in_shipment
-                and any(line.shipment_advice_id for line in picking.move_line_ids)
+                and any(
+                    line.shipment_advice_id and line.qty_done > 0
+                    for line in picking.move_line_ids
+                )
             )
             picking.loaded_shipment_advice_ids = (
                 picking.move_line_ids.shipment_advice_id
@@ -78,7 +82,11 @@ class StockPicking(models.Model):
             # Packages loading progress
             if total_packages_count:
                 loaded_packages_count = len(
-                    [pl for pl in picking.package_level_ids if pl.shipment_advice_id]
+                    [
+                        pl
+                        for pl in picking.package_level_ids
+                        if pl.shipment_advice_id and pl.is_done
+                    ]
                 )
                 picking.loaded_packages_progress_f = (
                     loaded_packages_count / total_packages_count
@@ -92,7 +100,7 @@ class StockPicking(models.Model):
                     [
                         ml
                         for ml in picking.move_line_ids_without_package
-                        if ml.shipment_advice_id
+                        if ml.shipment_advice_id and ml.qty_done > 0
                     ]
                 )
                 picking.loaded_move_lines_progress_f = (
@@ -107,13 +115,13 @@ class StockPicking(models.Model):
                     [
                         ml.result_package_id.shipping_weight or ml.move_id.weight
                         for ml in picking.move_line_ids_without_package
-                        if ml.shipment_advice_id
+                        if ml.shipment_advice_id and ml.qty_done > 0
                     ]
                 ) + sum(
                     [
                         pl.package_id.shipping_weight
                         for pl in picking.package_level_ids
-                        if pl.shipment_advice_id
+                        if pl.shipment_advice_id and pl.is_done
                     ]
                 )
                 total_weight = float_round(
