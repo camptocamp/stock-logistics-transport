@@ -24,8 +24,14 @@ class StockPicking(models.Model):
     loaded_packages_count = fields.Integer(
         "Packages loaded", compute="_compute_shipment_loaded_progress",
     )
+    total_packages_count = fields.Integer(
+        "Total packages", compute="_compute_shipment_loaded_progress",
+    )
     loaded_move_lines_count = fields.Integer(
         "Bulk lines loaded", compute="_compute_shipment_loaded_progress",
+    )
+    total_move_lines_count = fields.Integer(
+        "Total bulk lines", compute="_compute_shipment_loaded_progress",
     )
     loaded_packages_progress_f = fields.Float(
         "Packages loaded/total %",
@@ -40,6 +46,9 @@ class StockPicking(models.Model):
     loaded_progress_f = fields.Float(
         "Loaded/total %", digits=(3, 2), compute="_compute_shipment_loaded_progress"
     )
+    loaded_progress = fields.Char(
+        "Loaded/total", compute="_compute_shipment_loaded_progress"
+    )
     loaded_packages_progress = fields.Char(
         "Packages loaded/total", compute="_compute_shipment_loaded_progress"
     )
@@ -51,9 +60,6 @@ class StockPicking(models.Model):
     )
     loaded_weight_progress = fields.Char(
         "Weight/total", compute="_compute_shipment_loaded_progress"
-    )
-    loaded_progress = fields.Char(
-        "Loaded/total", compute="_compute_shipment_loaded_progress"
     )
     loaded_shipment_advice_ids = fields.Many2many(
         "shipment.advice", compute="_compute_loaded_in_shipment",
@@ -89,10 +95,10 @@ class StockPicking(models.Model):
             picking.loaded_move_lines_progress = ""
             picking.loaded_weight = 0
             picking.loaded_weight_progress = ""
-            total_packages_count = len(picking.package_level_ids.package_id)
-            total_move_lines_count = len(picking.move_line_ids_without_package)
+            picking.total_packages_count = len(picking.package_level_ids.package_id)
+            picking.total_move_lines_count = len(picking.move_line_ids_without_package)
             # Packages loading progress
-            if total_packages_count:
+            if picking.total_packages_count:
                 picking.loaded_packages_count = len(
                     [
                         pl
@@ -101,13 +107,13 @@ class StockPicking(models.Model):
                     ]
                 )
                 picking.loaded_packages_progress_f = (
-                    picking.loaded_packages_count / total_packages_count
+                    picking.loaded_packages_count / picking.total_packages_count
                 )
                 picking.loaded_packages_progress = (
-                    f"{picking.loaded_packages_count} / {total_packages_count}"
+                    f"{picking.loaded_packages_count} / {picking.total_packages_count}"
                 )
             # Lines loading progress
-            if total_move_lines_count:
+            if picking.total_move_lines_count:
                 picking.loaded_move_lines_count = len(
                     [
                         ml
@@ -116,10 +122,11 @@ class StockPicking(models.Model):
                     ]
                 )
                 picking.loaded_move_lines_progress_f = (
-                    picking.loaded_move_lines_count / total_move_lines_count
+                    picking.loaded_move_lines_count / picking.total_move_lines_count
                 )
                 picking.loaded_move_lines_progress = (
-                    f"{picking.loaded_move_lines_count} / {total_move_lines_count}"
+                    f"{picking.loaded_move_lines_count} "
+                    f"/ {picking.total_move_lines_count}"
                 )
             # Weight/total
             if picking.shipping_weight:
