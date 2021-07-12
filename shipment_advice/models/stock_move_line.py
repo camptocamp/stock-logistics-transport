@@ -78,3 +78,7 @@ class StockMoveLine(models.Model):
             )
         self.shipment_advice_id = False
         self.qty_done = 0
+
+    def _is_loaded_in_shipment(self):
+        """Return `True` if the move lines are loaded in a shipment."""
+        return all([line.qty_done and line.shipment_advice_id for line in self])

@@ -30,3 +30,7 @@ class StockPackageLevel(models.Model):
     def _unload_from_shipment(self):
         """Unload the package levels from their related shipment advice."""
         self.move_line_ids._unload_from_shipment()
+
+    def _is_loaded_in_shipment(self):
+        """Return `True` if the package levels are loaded in a shipment."""
+        return all([pl.is_done and pl.shipment_advice_id for pl in self])
