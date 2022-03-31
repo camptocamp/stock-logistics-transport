@@ -58,8 +58,8 @@ class ShipmentPlanning(models.Model):
         readonly=True,
         help="Use incoming to plan receptions, use outgoing for deliveries.",
     )
-    date_from = fields.Datetime()
-    date_to = fields.Datetime()
+    date_from = fields.Datetime(default=lambda self: fields.Date.context_today(self))
+    date_to = fields.Datetime(default=lambda self: fields.Date.context_today(self))
     picking_to_plan_ids = fields.One2many(
         comodel_name="stock.picking",
         inverse_name="shipment_planning_id",
