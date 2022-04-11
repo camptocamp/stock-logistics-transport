@@ -52,7 +52,8 @@ class ShipmentMaxoptraScheduleImport(models.TransientModel):
     )
     pick_operations_start_time = fields.Datetime(
         help="Start time for the first planned pick operation. "
-        "Leave empty to avoid rescheduling."
+        "Leave empty to avoid rescheduling.",
+        default=lambda self: self._default_start_time())
     )
     pick_operations_duration = fields.Float(help="Duration between each pick operation")
 
@@ -69,6 +70,14 @@ class ShipmentMaxoptraScheduleImport(models.TransientModel):
         ):
             res["shipment_planning_id"] = shipment_planning_id
         return res
+
+    @api.model
+    def _default_start_time(self):
+        user_tz = pytz.timezone(self.env.context.get('tz') or 'UTC')
+        date = pytz.utc.localize(fields.Datetime.now()).astimezone(user_tz)
+        date = date.replace(hour=6, minute=0, second=0)
+        date = date.astimezone(pytz.utc).replace(tzinfo=None)
+        return date
 
     # TODO Add constraints according to warehouse delivery steps?
 
