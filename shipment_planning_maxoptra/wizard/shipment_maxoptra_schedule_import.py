@@ -54,7 +54,7 @@ class ShipmentMaxoptraScheduleImport(models.TransientModel):
     pick_operations_start_time = fields.Datetime(
         help="Start time for the first planned pick operation. "
         "Leave empty to avoid rescheduling.",
-        default=lambda self: self._default_start_time()
+        default=lambda self: self._default_start_time(),
     )
     pick_operations_duration = fields.Float(help="Duration between each pick operation")
 
@@ -74,7 +74,7 @@ class ShipmentMaxoptraScheduleImport(models.TransientModel):
 
     @api.model
     def _default_start_time(self):
-        user_tz = pytz.timezone(self.env.context.get('tz') or 'UTC')
+        user_tz = pytz.timezone(self.env.context.get("tz") or "UTC")
         date = pytz.utc.localize(fields.Datetime.now()).astimezone(user_tz)
         date = date.replace(hour=6, minute=0, second=0)
         date = date.astimezone(pytz.utc).replace(tzinfo=None)
@@ -118,42 +118,48 @@ class ShipmentMaxoptraScheduleImport(models.TransientModel):
         scheduled_picking_ids = []
         for batch_picking in following_batch_pickings:
             cnt = 0
-            new_batch = self.env["stock.picking.batch"].create({})
-            # FIXME: If previous_picking have different source location, the
-            #  assignation to the batch will fail, and we should either create
-            #  one batch per source location or ignore some.
             for picking in batch_picking.picking_ids.sorted(
                 "scheduled_date", reverse_order
             ):
                 picking_moves = picking.move_lines
                 previous_moves = picking_moves.move_orig_ids
-                previous_pickings = previous_moves.picking_id
-                for pick in previous_pickings:
-                    # Avoid rescheduling same picking multiple times
-                    if pick.id in scheduled_picking_ids:
-                        continue
-                    pick_values = {"batch_id": new_batch.id}
-                    if start_datetime and operation_duration:
-                        hours, minutes = format_duration(operation_duration).split(":")
-                        delay = relativedelta(
-                            hours=cnt * int(hours), minutes=cnt * int(minutes)
-                        )
-                        pick_values["scheduled_date"] = start_datetime + delay
-                    pick.write(pick_values)
-                    # increment counter manually as we cannot use enumerate
-                    #  on the two nested loops
-                    cnt += 1
-            new_batch_picking_ids.append(new_batch.id)
+                pickings = previous_moves.picking_id
+                pick_locations = pickings.mapped("location_id")
+                for location in pick_locations:
+                    previous_pickings = pickings.filtered(
+                        lambda x: x.location_id.id == location.id
+                    )
+                    for pick in previous_pickings:
+                        new_batch = self.env["stock.picking.batch"].create({})
+                        # Avoid rescheduling same picking multiple times
+                        if pick.id in scheduled_picking_ids:
+                            continue
+                        pick_values = {"batch_id": new_batch.id}
+                        if start_datetime and operation_duration:
+                            hours, minutes = format_duration(operation_duration).split(
+                                ":"
+                            )
+                            delay = relativedelta(
+                                hours=cnt * int(hours), minutes=cnt * int(minutes)
+                            )
+                            pick_values["scheduled_date"] = start_datetime + delay
+                        pick.write(pick_values)
+                        # increment counter manually as we cannot use enumerate
+                        #  on the two nested loops
+                        cnt += 1
+                new_batch_picking_ids.append(new_batch.id)
         return self.env["stock.picking.batch"].browse(new_batch_picking_ids)
 
     def create_delivery_batch_picking_by_vehicle(self, schedule_by_vehicles):
         batch_ids = []
         for vehicle_name, maxoptra_deliveries in schedule_by_vehicles.items():
-            for p_type, picks in self._prepare_pickings(maxoptra_deliveries):
+            for _p_type, picks in self._prepare_pickings(maxoptra_deliveries):
                 batch_picking_values = self._prepare_batch_picking_values(
                     vehicle_name, driver_name=maxoptra_deliveries[0].get("driver")
                 )
-                batch_picking = self.env["stock.picking.batch"].create(batch_picking_values)
+                batch_picking = self.env["stock.picking.batch"].create(
+                    batch_picking_values
+                )
                 batch_ids.append(batch_picking.id)
                 for pick in picks:
                     pick.write(
@@ -172,27 +178,25 @@ class ShipmentMaxoptraScheduleImport(models.TransientModel):
             )
             picking.write(
                 {
-                    "scheduled_date": delivery.get(
-                        "scheduled_delivery_start_datetime"
-                    ),
+                    "scheduled_date": delivery.get("scheduled_delivery_start_datetime"),
                 }
             )
 
     def _prepare_pickings(self, maxoptra_deliveries):
-        picking_names = [delivery.get("picking_name") for delivery in maxoptra_deliveries]
+        picking_names = [
+            delivery.get("picking_name") for delivery in maxoptra_deliveries
+        ]
         pickings = self.env["stock.picking"].search(
-                    [("name", "in", picking_names)], order="picking_type_id"
-                )
+            [("name", "in", picking_names)], order="picking_type_id"
+        )
         if len(pickings) != len(picking_names):
             p_names = set(pickings.mapped("name"))
             missing_names = set(picking_names) - p_names
             raise UserError(
-                _("No matching picking found for Order reference \n %s") %
-                ", ".join(list(missing_names))
+                _("No matching picking found for Order reference \n %s")
+                % ", ".join(list(missing_names))
             )
-        return groupby(
-                pickings, key=lambda m: m.picking_type_id
-            )
+        return groupby(pickings, key=lambda m: m.picking_type_id)
 
     def _prepare_batch_picking_values(self, vehicle_name, driver_name=None):
         vehicle = self.env["shipment.vehicle"].search([("name", "=", vehicle_name)])
