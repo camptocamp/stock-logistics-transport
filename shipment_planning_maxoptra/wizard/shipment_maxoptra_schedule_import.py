@@ -4,6 +4,7 @@ import base64
 import codecs
 import csv
 import io
+import logging
 from datetime import datetime
 
 import pytz
@@ -19,6 +20,8 @@ from ..const import MAXOPTRA_DATETIME_FORMAT
 
 # Copied from odoo.tools.pycompat to use with DictReader
 _reader = codecs.getreader("utf-8")
+
+logger = logging.getLogger(__name__)
 
 
 class ShipmentMaxoptraScheduleImport(models.TransientModel):
@@ -89,12 +92,12 @@ class ShipmentMaxoptraScheduleImport(models.TransientModel):
 
     def action_import_schedule(self):
         self.ensure_one()
+        pick_batches = self.env["stock.picking.batch"]
         maxoptra_schedule = self.read_csv()
         schedule_by_vehicles = self.group_schedule_by_vehicle(maxoptra_schedule)
         delivery_batch_pickings = self.create_delivery_batch_picking_by_vehicle(
             schedule_by_vehicles
         )
-        pick_batches = self.env["stock.picking.batch"]
         self.update_scheduled_date(maxoptra_schedule)
         if self.warehouse_delivery_steps == "pick_ship":
             if self.regroup_pick_operations:
@@ -113,38 +116,40 @@ class ShipmentMaxoptraScheduleImport(models.TransientModel):
             )
         self.update_shipment_planning(delivery_batch_pickings | pick_batches)
 
-    # Method helps to create separate batches for each picking operation
     def regroup_operations(
         self,
-        following_batch_pickings,
+        tour_batches,
         reverse_order=False,
         start_datetime=False,
         operation_duration=False,
     ):
+        # create batch operation for precedent operations
+        # batch created for each vehicle and operation type
         new_batch_picking_ids = []
         batch_obj = self.env["stock.picking.batch"]
-        cnt = 0
-        # TODO check JIT flow for picks sorted("scheduled_date", reverse_order)
-        original_pickings = following_batch_pickings.picking_ids
-        previous_pickings = original_pickings.move_lines.move_orig_ids.picking_id
-        for _type, pick_list in self._group_to_batch_flow(previous_pickings):
-            picks = self.env["stock.picking"].browse([pick.id for pick in pick_list])
-            new_batch = batch_obj.create({"picking_ids": [(6, 0, picks.ids)]})
-            new_batch_picking_ids.append(new_batch.id)
-            if start_datetime and operation_duration:
-                # TODO pickings should be loaded to track in particular order
-                for pick in picks.sorted("scheduled_date", reverse_order):
-                    hours, minutes = format_duration(operation_duration).split(":")
-                    delay = relativedelta(
-                        hours=cnt * int(hours), minutes=cnt * int(minutes)
-                    )
+        if operation_duration:
+            hours, minutes = format_duration(operation_duration).split(":")
 
-                    # TODO define is start_datime global for all pickings in the wizard
-                    # or separate for each batch
-                    pick.write({"scheduled_date": start_datetime + delay})
-                    # increment counter manually as we cannot use enumerate
-                    #  on the two nested loops
-                    cnt += 1
+        for batch_picking in tour_batches:
+            cnt = 0
+            original_pickings = batch_picking.picking_ids
+            previous_pickings = original_pickings.move_lines.move_orig_ids.picking_id
+            for _type, pick_list in self._group_to_batch_flow(previous_pickings):
+                picks = self.env["stock.picking"].browse(
+                    [pick.id for pick in pick_list]
+                )
+                new_batch = batch_obj.create({"picking_ids": [(6, 0, picks.ids)]})
+                new_batch_picking_ids.append(new_batch.id)
+                if start_datetime and operation_duration:
+                    picks = self.sort_on_outgoing_date(picks, reverse_order)
+                    for pick in picks:
+                        delay = relativedelta(
+                            hours=cnt * int(hours), minutes=cnt * int(minutes)
+                        )
+                        pick.write({"scheduled_date": start_datetime + delay})
+                        # increment counter manually as we cannot use enumerate
+                        # on the two nested loops
+                        cnt += 1
         return batch_obj.browse(new_batch_picking_ids)
 
     def create_delivery_batch_picking_by_vehicle(self, schedule_by_vehicles):
@@ -202,8 +207,22 @@ class ShipmentMaxoptraScheduleImport(models.TransientModel):
         # TODO grouping same as a type
         return groupby(pickings, key=lambda m: m.picking_type_id)
 
+    def sort_on_outgoing_date(self, picking, order):
+        # sort pickings to the dates assigned in outgoing picking
+        def _component_sort_key(pick):
+            out = pick.group_id.stock_move_ids.picking_id.filtered(
+                lambda self: self.picking_type_code == "outgoing"
+            )
+            return fields.first(out).scheduled_date
+
+        return sorted(picking, key=lambda x: _component_sort_key(x), reverse=order)
+
     def _prepare_batch_picking_values(self, vehicle_name, driver_name=None):
         vehicle = self.env["shipment.vehicle"].search([("name", "=", vehicle_name)])
+        if not vehicle:
+            logger.warning(
+                "Vehicle for %s is not found batch left without driver" % vehicle_name
+            )
         values = {
             "company_id": self.shipment_planning_id.company_id.id,
             "vehicle_id": vehicle.id,
@@ -212,6 +231,11 @@ class ShipmentMaxoptraScheduleImport(models.TransientModel):
             driver = self.env["res.partner"].search(
                 [("maxoptra_driver_name", "=", driver_name)]
             )
+            if not driver:
+                logger.warning(
+                    "Vehicle for %s is not found batch left without driver"
+                    % driver_name
+                )
             if driver:
                 values["driver_id"] = driver.id
         return values

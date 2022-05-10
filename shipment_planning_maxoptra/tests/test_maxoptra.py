@@ -300,24 +300,22 @@ class TestMaxoptra(SavepointCase):
         pick_batch_vehicle_1 = pick_pickings_vehicle_1.mapped("batch_id")
         self.assertEqual(len(pick_batch_vehicle_1), 1)
         self.assertFalse(pick_batch_vehicle_1.driver_id)
-        # TODO restore test case
-        # as order of picking changed assigning of date is broken
-        # self.assertEqual(
-        #     self._get_previous_pickings(self.delivery_lumber).scheduled_date,
-        #     pick_start_time,
-        # )
-        # self.assertEqual(
-        #     self._get_previous_pickings(self.delivery_ready).scheduled_date,
-        #     pick_start_time + relativedelta(minutes=15),
-        # )
-        # self.assertEqual(
-        #     self._get_previous_pickings(self.delivery_jackson).scheduled_date,
-        #     pick_start_time + relativedelta(minutes=30),
-        # )
-        # self.assertEqual(
-        #     self._get_previous_pickings(self.delivery_azure).scheduled_date,
-        #     pick_start_time + relativedelta(minutes=45),
-        # )
+        self.assertEqual(
+            self._get_previous_pickings(self.delivery_lumber).scheduled_date,
+            pick_start_time,
+        )
+        self.assertEqual(
+            self._get_previous_pickings(self.delivery_ready).scheduled_date,
+            pick_start_time + relativedelta(minutes=15),
+        )
+        self.assertEqual(
+            self._get_previous_pickings(self.delivery_jackson).scheduled_date,
+            pick_start_time + relativedelta(minutes=30),
+        )
+        self.assertEqual(
+            self._get_previous_pickings(self.delivery_azure).scheduled_date,
+            pick_start_time + relativedelta(minutes=45),
+        )
         # South bay area deliveries are grouped on Vehicle3
         delivery_batch_vehicle_3 = self.env["stock.picking.batch"].search(
             [
@@ -337,13 +335,12 @@ class TestMaxoptra(SavepointCase):
         pick_batch_vehicle_3 = pick_pickings_vehicle_3.mapped("batch_id")
         self.assertEqual(len(pick_batch_vehicle_3), 1)
         self.assertFalse(pick_batch_vehicle_3.driver_id)
-        # TODO restore test case
-        # self.assertEqual(
-        #     self._get_previous_pickings(self.delivery_deco_addict).scheduled_date,
-        #     pick_start_time,
-        # )
-        # self.assertEqual(
-        #     self._get_previous_pickings(self.delivery_gemini).scheduled_date,
-        #     pick_start_time + relativedelta(minutes=15),
-        # )
+        self.assertEqual(
+            self._get_previous_pickings(self.delivery_deco_addict).scheduled_date,
+            pick_start_time,
+        )
+        self.assertEqual(
+            self._get_previous_pickings(self.delivery_gemini).scheduled_date,
+            pick_start_time + relativedelta(minutes=15),
+        )
         # TODO scheduled_date doesn't have impact on scheduled_date on batch
