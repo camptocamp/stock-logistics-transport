@@ -15,6 +15,16 @@ class ResPartner(models.Model):
         "partner to set on Batch pickings after import.",
     )
 
+    partner_key = fields.Text(string="Key")
+
+    _sql_constraints = [
+        (
+            "partner_key_uniq",
+            "unique(partner_key)",
+            "partner key must be unique!",
+        ),
+    ]
+
     def _get_maxoptra_address(self):
         self.ensure_one()
         args = {
