@@ -1,6 +1,7 @@
 # Copyright 2022 Camptocamp SA
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl)
-from odoo import fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
 
 from ..const import MAXOPTRA_ADDRESS_FORMAT
 
@@ -15,15 +16,25 @@ class ResPartner(models.Model):
         "partner to set on Batch pickings after import.",
     )
 
-    partner_key = fields.Text(string="Key")
+    maxoptra_partner_key = fields.Text(string="Maxoptra Key")
 
-    _sql_constraints = [
-        (
-            "partner_key_uniq",
-            "unique(partner_key)",
-            "partner key must be unique!",
-        ),
-    ]
+    @api.constrains("maxoptra_partner_key")
+    def _check_maxoptra_partner_key(self):
+        """ Check that the maxoptra_partner_key is unique """
+        for record in self:
+            existing_partners_ids = (
+                self.env["res.partner"].search(
+                    [("maxoptra_partner_key", "=", record.maxoptra_partner_key)]
+                )
+                - record
+            )
+            if existing_partners_ids:
+                raise ValidationError(
+                    _(
+                        "The Maxoptra partner key(%s) should be unique. Try another value.",
+                        record.maxoptra_partner_key,
+                    )
+                )
 
     def _get_maxoptra_address(self):
         self.ensure_one()
