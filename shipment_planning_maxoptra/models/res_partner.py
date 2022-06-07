@@ -16,7 +16,7 @@ class ResPartner(models.Model):
         "partner to set on Batch pickings after import.",
     )
 
-    maxoptra_partner_key = fields.Text(string="Maxoptra Key")
+    maxoptra_partner_key = fields.Char(string="Maxoptra Key")
 
     @api.constrains("maxoptra_partner_key")
     def _check_maxoptra_partner_key(self):
