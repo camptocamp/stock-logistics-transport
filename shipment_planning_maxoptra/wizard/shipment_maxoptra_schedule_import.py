@@ -114,14 +114,10 @@ class ShipmentMaxoptraScheduleImport(models.TransientModel):
         # batch created for each vehicle and operation type
         new_batch_picking_ids = []
         batch_obj = self.env["stock.picking.batch"]
-        if operation_duration:
-            hours, minutes = format_duration(operation_duration).split(":")
-
         for batch_picking in tour_batches:
             original_pickings = batch_picking.picking_ids
             previous_pickings = original_pickings.move_lines.move_orig_ids.picking_id
             for _type, pick_list in self._group_to_batch_flow(previous_pickings):
-                cnt = 0
                 picks = self.env["stock.picking"].browse(
                     [pick.id for pick in pick_list]
                 )
@@ -130,22 +126,13 @@ class ShipmentMaxoptraScheduleImport(models.TransientModel):
                         "vehicle_id": batch_picking.vehicle_id.id,
                         "driver_id": batch_picking.driver_id.id,
                         "picking_ids": [(6, 0, picks.ids)],
-                        "scheduled_date": batch_picking.scheduled_date,
                     }
                 )
                 new_batch_picking_ids.append(new_batch.id)
                 if operation_duration:
+                    scheduled_date = batch_picking.scheduled_date
                     picks = self.sort_on_outgoing_date(picks, reverse_order)
-                    for pick in picks:
-                        delay = relativedelta(
-                            hours=cnt * int(hours), minutes=cnt * int(minutes)
-                        )
-                        pick.write(
-                            {"scheduled_date": batch_picking.scheduled_date + delay}
-                        )
-                        # increment counter manually as we cannot use enumerate
-                        # on the two nested loops
-                        cnt += 1
+                    self._reschedule_time_on_picks(picks, operation_duration, scheduled_date)
         return batch_obj.browse(new_batch_picking_ids)
 
     def create_delivery_batch_picking_by_vehicle(self, schedule_by_vehicles):
@@ -285,19 +272,21 @@ class ShipmentMaxoptraScheduleImport(models.TransientModel):
 
     def _update_sceduled_time_on_batch(self, batches, operation_duration):
         if operation_duration:
-            hours, minutes = format_duration(operation_duration).split(":")
-        cnt = 0
-        for batch in batches:
-            batch.scheduled_date = min(batch.mapped("picking_ids.scheduled_date"))
-            if operation_duration:
-                for pick in batch.picking_ids:
-                    delay = relativedelta(
-                        hours=cnt * int(hours), minutes=cnt * int(minutes)
-                    )
-                    pick.write({"scheduled_date": batch.scheduled_date + delay})
-                    cnt += 1
+            for batch in batches:
+                scheduled_date = min(batch.mapped("picking_ids.scheduled_date"))
+                self._reschedule_time_on_picks(batch.picking_ids, operation_duration, scheduled_date)
 
     def _cleanup_batches(self):
         self.env["stock.picking.batch"].search(
             [("state", "=", "draft"), ("picking_ids", "=", False)]
         ).unlink()
+
+    def _reschedule_time_on_picks(self, pick_ids, operation_duration, planned_date):
+        cnt = 0
+        hours, minutes = format_duration(operation_duration).split(":")
+        for pick in pick_ids:
+            delay = relativedelta(
+                hours=cnt * int(hours), minutes=cnt * int(minutes)
+            )
+            pick.write({"scheduled_date": planned_date + delay})
+            cnt += 1
