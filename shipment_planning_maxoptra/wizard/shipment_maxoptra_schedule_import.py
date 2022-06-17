@@ -266,18 +266,12 @@ class ShipmentMaxoptraScheduleImport(models.TransientModel):
         return res
 
     def read_row(self, row):
-        delivery_start = datetime.strptime(
-            row.get("Scheduled arrival time"), MAXOPTRA_DATETIME_FORMAT
-        )
         driving_start = datetime.strptime(
             row.get("DrivingStartTime"), MAXOPTRA_DATETIME_FORMAT
         )
         if self.tz:
             timezone = pytz.timezone(self.tz)
             utc = pytz.utc
-            delivery_start = (
-                timezone.localize(delivery_start).astimezone(utc).replace(tzinfo=None)
-            )
             driving_start = (
                 timezone.localize(driving_start).astimezone(utc).replace(tzinfo=None)
             )
@@ -286,7 +280,6 @@ class ShipmentMaxoptraScheduleImport(models.TransientModel):
             "picking_scheduled_seq": row.get("Scheduled sequence"),
             "driver": row.get("Performer name"),
             "vehicle": row.get("Vehicle name"),
-            "scheduled_delivery_start_datetime": delivery_start,
             "driving_start_time": driving_start,
         }
 
