@@ -128,6 +128,10 @@ class ShipmentMaxoptraScheduleImport(models.TransientModel):
                         "picking_ids": [(6, 0, picks.ids)],
                     }
                 )
+                picks.write({
+                    "vehicle_id": batch_picking.vehicle_id.id,
+                    "driver_id": batch_picking.driver_id.id,
+                })
                 new_batch_picking_ids.append(new_batch.id)
                 if operation_duration:
                     scheduled_date = batch_picking.scheduled_date
