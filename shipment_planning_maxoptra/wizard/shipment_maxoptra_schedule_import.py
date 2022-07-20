@@ -84,8 +84,10 @@ class ShipmentMaxoptraScheduleImport(models.TransientModel):
             schedule_by_vehicles
         )
         self.update_scheduled_date(maxoptra_schedule)
-        self._update_sceduled_time_on_batch(
-            delivery_batch_pickings, self.pick_operations_duration
+        self._update_scheduled_time_on_batch(
+            delivery_batch_pickings,
+            self.pick_operations_duration,
+            self.reverse_order_pick_operations,
         )
         if self.warehouse_delivery_steps == "pick_ship":
             if self.regroup_pick_operations:
@@ -128,15 +130,19 @@ class ShipmentMaxoptraScheduleImport(models.TransientModel):
                         "picking_ids": [(6, 0, picks.ids)],
                     }
                 )
-                picks.write({
-                    "vehicle_id": batch_picking.vehicle_id.id,
-                    "driver_id": batch_picking.driver_id.id,
-                })
+                picks.write(
+                    {
+                        "vehicle_id": batch_picking.vehicle_id.id,
+                        "driver_id": batch_picking.driver_id.id,
+                    }
+                )
                 new_batch_picking_ids.append(new_batch.id)
                 if operation_duration:
                     scheduled_date = batch_picking.scheduled_date
-                    picks = self.sort_on_outgoing_date(picks, reverse_order)
-                    self._reschedule_time_on_picks(picks, operation_duration, scheduled_date)
+                    picks = self.sort_on_outgoing_date(picks)
+                    self._reschedule_time_on_picks(
+                        picks, operation_duration, scheduled_date
+                    )
         return batch_obj.browse(new_batch_picking_ids)
 
     def create_delivery_batch_picking_by_vehicle(self, schedule_by_vehicles):
@@ -194,7 +200,7 @@ class ShipmentMaxoptraScheduleImport(models.TransientModel):
         # TODO grouping same as a type
         return groupby(pickings, key=lambda m: m.picking_type_id)
 
-    def sort_on_outgoing_date(self, picking, order):
+    def sort_on_outgoing_date(self, picking, order=False):
         # sort pickings to the dates assigned in outgoing picking
         def _component_sort_key(pick):
             out = pick.group_id.stock_move_ids.picking_id.filtered(
@@ -274,11 +280,16 @@ class ShipmentMaxoptraScheduleImport(models.TransientModel):
             "driving_start_time": driving_start,
         }
 
-    def _update_sceduled_time_on_batch(self, batches, operation_duration):
+    def _update_scheduled_time_on_batch(
+        self, batches, operation_duration, reverse_order=False
+    ):
         if operation_duration:
             for batch in batches:
                 scheduled_date = min(batch.mapped("picking_ids.scheduled_date"))
-                self._reschedule_time_on_picks(batch.picking_ids, operation_duration, scheduled_date)
+                picks = self.sort_on_outgoing_date(batch.picking_ids, reverse_order)
+                self._reschedule_time_on_picks(
+                    picks, operation_duration, scheduled_date
+                )
 
     def _cleanup_batches(self):
         self.env["stock.picking.batch"].search(
@@ -289,8 +300,6 @@ class ShipmentMaxoptraScheduleImport(models.TransientModel):
         cnt = 0
         hours, minutes = format_duration(operation_duration).split(":")
         for pick in pick_ids:
-            delay = relativedelta(
-                hours=cnt * int(hours), minutes=cnt * int(minutes)
-            )
+            delay = relativedelta(hours=cnt * int(hours), minutes=cnt * int(minutes))
             pick.write({"scheduled_date": planned_date + delay})
             cnt += 1
