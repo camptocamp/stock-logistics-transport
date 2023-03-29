@@ -14,4 +14,5 @@
         "wizards/shipment_advice_planner.xml",
     ],
     "demo": [],
+    "pre_init_hook": "pre_init_hook",
 }
