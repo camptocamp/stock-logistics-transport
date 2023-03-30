@@ -49,7 +49,7 @@ class ShipmentAdvicePlanner(models.TransientModel):
         self.ensure_one()
         self._check_warehouse()
 
-    @api.depends("picking_to_plan_ids")
+    @api.constrains("picking_to_plan_ids")
     def _check_picking_to_plan(self):
         for rec in self:
             if rec.picking_to_plan_ids.filtered(
