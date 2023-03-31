@@ -7,9 +7,6 @@ from odoo import api, fields, models
 class StockPicking(models.Model):
     _inherit = "stock.picking"
 
-    warehouse_id = fields.Many2one(
-        comodel_name="stock.warehouse", related="location_id.warehouse_id", store=True
-    )
     can_be_planned_in_shipment_advice = fields.Boolean(
         compute="_compute_can_be_planned_in_shipment_advice", store=True
     )

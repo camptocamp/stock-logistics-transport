@@ -33,7 +33,7 @@ class TestShipmentAdvicePlanner(TransactionCase):
         self.assertEqual(len(shipments), 2)
         self.assertEqual(len(shipments.mapped("warehouse_id")), 2)
         self.assertEqual(
-            shipments.mapped("warehouse_id"), self.pickings.mapped("warehouse_id")
+            shipments.warehouse_id, self.pickings.picking_type_id.warehouse_id
         )
 
     def test_shipment_advice_planner_one_warehouse(self):
@@ -41,7 +41,9 @@ class TestShipmentAdvicePlanner(TransactionCase):
         self.assertEqual(len(self.wizard_form.picking_to_plan_ids), 9)
         wizard = self.wizard_form.save()
         action = wizard.button_plan_shipments()
-        self.assertEqual(wizard.picking_to_plan_ids.warehouse_id, self.warehouse)
+        self.assertEqual(
+            wizard.picking_to_plan_ids.picking_type_id.warehouse_id, self.warehouse
+        )
         shipment = self.env[action.get("res_model")].search(action.get("domain"))
         self.assertEqual(len(shipment), 1)
         self.assertEqual(shipment.warehouse_id, self.warehouse)
@@ -55,7 +57,9 @@ class TestShipmentAdvicePlanner(TransactionCase):
         self.wizard_form.dock_id = self.dock
         wizard = self.wizard_form.save()
         action = wizard.button_plan_shipments()
-        self.assertEqual(wizard.picking_to_plan_ids.warehouse_id, self.warehouse)
+        self.assertEqual(
+            wizard.picking_to_plan_ids.picking_type_id.warehouse_id, self.warehouse
+        )
         shipment = self.env[action.get("res_model")].search(action.get("domain"))
         self.assertEqual(shipment.dock_id, self.dock)
 
@@ -66,7 +70,7 @@ class TestShipmentAdvicePlanner(TransactionCase):
         ):
             self.wizard_form.picking_to_plan_ids.add(
                 self.pickings.filtered(
-                    lambda p, w=self.warehouse2: p.warehouse_id == w
+                    lambda p, w=self.warehouse2: p.picking_type_id.warehouse_id == w
                 )[0]
             )
         self.wizard_form.warehouse_id = self.warehouse2

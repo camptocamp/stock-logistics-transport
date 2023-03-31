@@ -14,7 +14,7 @@ class ShipmentAdvicePlanner(models.TransientModel):
         string="Pickings to plan",
         required=True,
         domain='[("can_be_planned_in_shipment_advice", "=", True),'
-        '("warehouse_id", "=?", warehouse_id),]',
+        '("picking_type_id.warehouse_id", "=?", warehouse_id),]',
         compute="_compute_picking_to_plan_ids",
         store=True,
         readonly=False,
@@ -38,7 +38,8 @@ class ShipmentAdvicePlanner(models.TransientModel):
                 )
             if (
                 rec.picking_to_plan_ids
-                and rec.picking_to_plan_ids.warehouse_id != rec.warehouse_id
+                and rec.picking_to_plan_ids.picking_type_id.warehouse_id
+                != rec.warehouse_id
             ):
                 raise ValidationError(
                     _("The transfers don't belong to the selected warehouse.")
@@ -80,7 +81,7 @@ class ShipmentAdvicePlanner(models.TransientModel):
             [
                 ("id", "in", active_ids),
                 ("can_be_planned_in_shipment_advice", "=", True),
-                ("warehouse_id", "=?", self.warehouse_id.id),
+                ("picking_type_id.warehouse_id", "=?", self.warehouse_id.id),
             ]
         )
 
@@ -112,40 +113,40 @@ class ShipmentAdvicePlanner(models.TransientModel):
         shipment_advice_model = self.env["shipment.advice"]
         create_vals = []
         for (
-            warehouse,
+            picking_type,
             pickings_to_plan,
-        ) in self._get_picking_to_plan_by_warehouse().items():
-            create_vals.extend(prepare_method(warehouse, pickings_to_plan))
+        ) in self._get_picking_to_plan_by_picking_type().items():
+            create_vals.extend(prepare_method(picking_type, pickings_to_plan))
         return shipment_advice_model.create(create_vals)
 
     def _get_prepare_method_name(self):
         return f"_prepare_shipment_advice_{self.shipment_planning_method}_vals_list"
 
-    def _get_picking_to_plan_by_warehouse(self):
+    def _get_picking_to_plan_by_picking_type(self):
         self.ensure_one()
-        warehouse_model = self.env["stock.warehouse"]
+        picking_type_model = self.env["stock.picking.type"]
         picking_model = self.env["stock.picking"]
         res = {}
         for group in picking_model.read_group(
             [("id", "in", self.picking_to_plan_ids.ids)],
-            ["warehouse_id"],
-            ["warehouse_id"],
+            ["picking_type_id"],
+            ["picking_type_id"],
         ):
-            warehouse = warehouse_model.browse(group.get("warehouse_id")[0])
-            res[warehouse] = picking_model.search(group.get("__domain"))
+            picking_type = picking_type_model.browse(group.get("picking_type_id")[0])
+            res[picking_type] = picking_model.search(group.get("__domain"))
         return res
 
-    def _prepare_shipment_advice_simple_vals_list(self, warehouse, pickings_to_plan):
+    def _prepare_shipment_advice_simple_vals_list(self, picking_type, pickings_to_plan):
         self.ensure_one()
-        vals = self._prepare_shipment_advice_common_vals(warehouse)
+        vals = self._prepare_shipment_advice_common_vals(picking_type)
         vals["planned_move_ids"] = [Command.set(pickings_to_plan.move_ids.ids)]
         return [vals]
 
-    def _prepare_shipment_advice_common_vals(self, warehouse):
+    def _prepare_shipment_advice_common_vals(self, picking_type):
         self.ensure_one()
         return {
             "shipment_type": "outgoing",
-            "warehouse_id": warehouse.id,
+            "warehouse_id": picking_type.warehouse_id.id,
             "dock_id": self.dock_id.id,
-            "company_id": warehouse.company_id.id,
+            "company_id": picking_type.company_id.id,
         }

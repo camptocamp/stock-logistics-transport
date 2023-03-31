@@ -33,22 +33,3 @@ def pre_init_hook(cr):
         """
         )
         _logger.info(f"{cr.rowcount} rows updated in stock_picking")
-
-    if not sql.column_exists(cr, "stock_picking", "warehouse_id"):
-        _logger.info("Creating column warehouse_id into stock_picking")
-        cr.execute(
-            """
-            ALTER TABLE stock_picking ADD COLUMN warehouse_id integer;
-            """
-        )
-        cr.execute(
-            """
-            UPDATE stock_picking
-            SET warehouse_id = stock_location.warehouse_id
-            FROM stock_location
-            WHERE
-                stock_picking.location_id = stock_location.id
-                AND stock_location.warehouse_id is not null;
-        """
-        )
-        _logger.info(f"{cr.rowcount} rows updated in stock_picking")
