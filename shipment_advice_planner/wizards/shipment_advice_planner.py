@@ -149,4 +149,7 @@ class ShipmentAdvicePlanner(models.TransientModel):
             "warehouse_id": picking_type.warehouse_id.id,
             "dock_id": self.dock_id.id,
             "company_id": picking_type.company_id.id,
+            "arrival_date": fields.Datetime.now(),
+            "departure_date": fields.Datetime.now(),
+            "state": "confirmed",
         }
