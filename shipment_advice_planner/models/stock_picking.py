@@ -2,13 +2,15 @@
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
 from odoo import api, fields, models
+from odoo.osv.expression import distribute_not
 
 
 class StockPicking(models.Model):
     _inherit = "stock.picking"
 
     can_be_planned_in_shipment_advice = fields.Boolean(
-        compute="_compute_can_be_planned_in_shipment_advice", store=True
+        compute="_compute_can_be_planned_in_shipment_advice",
+        search="_search_can_be_planned_in_shipment_advice",
     )
 
     @api.model
@@ -23,6 +25,17 @@ class StockPicking(models.Model):
                 and rec.state == "assigned"
                 and rec.picking_type_code == "outgoing"
             )
+
+    def _search_can_be_planned_in_shipment_advice(self, operator, value):
+        if (operator == "=" and value) or (operator == "!=" and not value):
+            return [
+                ("planned_shipment_advice_id", "=", False),
+                ("state", "=", "assigned"),
+                ("picking_type_code", "=", "outgoing"),
+            ]
+        return distribute_not(
+            ["!"] + self._search_can_be_planned_in_shipment_advice("=", True)
+        )
 
     def init(self):
         self.env.cr.execute(
