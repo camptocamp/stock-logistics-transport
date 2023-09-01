@@ -2,7 +2,6 @@
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
 from odoo import api, fields, models
-from odoo.osv.expression import distribute_not
 
 
 class StockPicking(models.Model):
@@ -33,9 +32,13 @@ class StockPicking(models.Model):
                 ("state", "=", "assigned"),
                 ("picking_type_code", "=", "outgoing"),
             ]
-        return distribute_not(
-            ["!"] + self._search_can_be_planned_in_shipment_advice("=", True)
-        )
+        return [
+            "|",
+            "|",
+            ("planned_shipment_advice_id", "!=", False),
+            ("state", "!=", "assigned"),
+            ("picking_type_code", "!=", "outgoing"),
+        ]
 
     def init(self):
         self.env.cr.execute(
