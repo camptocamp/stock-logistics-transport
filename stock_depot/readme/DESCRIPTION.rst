@@ -1,0 +1,1 @@
+Manage partners stock depots.
