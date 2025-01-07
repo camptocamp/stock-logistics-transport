@@ -3,8 +3,9 @@
 * Simone Orsi <simahawk@gmail.com>
 * `Trobz <https://trobz.com>`_:
   * Dung Tran <dungtd@trobz.com>
-* Michael Tietz (MT Software) <mtietz@mt-software.de>
-
+  * Michael Tietz (MT Software) <mtietz@mt-software.de>
+  * Tuan Tran <anhtuan@trobz.com>
+  * Tri Doan <tridm@trobz.com>
 Design
 ~~~~~~
 
